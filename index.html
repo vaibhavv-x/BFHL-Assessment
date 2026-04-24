@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BFHL — Node Hierarchy Analyzer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #080b10;
+      --surface: #0d1117;
+      --surface2: #161b22;
+      --border: #21262d;
+      --accent: #00e5a0;
+      --accent2: #7c6fff;
+      --warn: #ff6b6b;
+      --dup: #ffa94d;
+      --text: #e6edf3;
+      --muted: #6e7681;
+      --card-shadow: 0 4px 24px rgba(0,0,0,.5);
+    }
+
+    body {
+      font-family: 'Syne', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── GRID BG ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,160,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,160,.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+
+    /* ── HEADER ── */
+    header {
+      padding: 60px 0 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--accent);
+      background: rgba(0,229,160,.08);
+      border: 1px solid rgba(0,229,160,.2);
+      border-radius: 100px;
+      padding: 4px 14px;
+      width: fit-content;
+      letter-spacing: .05em;
+    }
+
+    .badge::before { content: '●'; font-size: 8px; }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3.4rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -.03em;
+    }
+
+    h1 span { color: var(--accent); }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 400;
+      max-width: 480px;
+      line-height: 1.6;
+    }
+
+    /* ── INPUT SECTION ── */
+    .input-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 32px;
+      box-shadow: var(--card-shadow);
+    }
+
+    .input-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .input-label span {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .example-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      background: rgba(124,111,255,.12);
+      border: 1px solid rgba(124,111,255,.25);
+      color: var(--accent2);
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .example-btn:hover { background: rgba(124,111,255,.2); }
+
+    textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      resize: vertical;
+      min-height: 140px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--muted); }
+
+    .input-hint {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .submit-btn {
+      margin-top: 20px;
+      width: 100%;
+      padding: 16px;
+      background: var(--accent);
+      color: #080b10;
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: .03em;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: opacity .15s, transform .1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .submit-btn:hover { opacity: .9; }
+    .submit-btn:active { transform: scale(.99); }
+    .submit-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(8,11,16,.3);
+      border-top-color: #080b10;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    .loading .spinner { display: block; }
+    .loading .btn-text { display: none; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── ERROR ── */
+    .error-box {
+      background: rgba(255,107,107,.08);
+      border: 1px solid rgba(255,107,107,.3);
+      border-radius: 10px;
+      padding: 16px 20px;
+      color: var(--warn);
+      font-size: 14px;
+      margin-bottom: 28px;
+      display: none;
+    }
+    .error-box.visible { display: block; }
+
+    /* ── RESULTS ── */
+    #results { display: none; }
+    #results.visible { display: block; }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .results-header h2 {
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .clear-btn {
+      font-size: 12px;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: 'Syne', sans-serif;
+      transition: color .15s;
+    }
+    .clear-btn:hover { color: var(--text); }
+
+    /* Identity */
+    .identity-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .id-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+    }
+
+    .id-chip .key {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .id-chip .val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--accent);
+    }
+
+    /* Summary */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-num {
+      font-size: 2.4rem;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      margin-top: 6px;
+    }
+
+    /* Section headers */
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--muted);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Hierarchies */
+    .hierarchies-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 28px; }
+
+    .hierarchy-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+
+    .hierarchy-card:hover { border-color: rgba(0,229,160,.3); }
+
+    .hc-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--surface2);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .hc-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .root-node {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      background: rgba(0,229,160,.12);
+      color: var(--accent);
+      border: 1.5px solid rgba(0,229,160,.3);
+    }
+
+    .root-node.cycle {
+      background: rgba(255,107,107,.1);
+      color: var(--warn);
+      border-color: rgba(255,107,107,.3);
+    }
+
+    .hc-info {}
+    .hc-info .hc-root { font-weight: 700; font-size: 15px; }
+    .hc-info .hc-meta { font-size: 12px; color: var(--muted); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+
+    .hc-badges { display: flex; gap: 8px; align-items: center; }
+
+    .tag {
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 3px 10px;
+      border-radius: 100px;
+    }
+
+    .tag-depth { background: rgba(0,229,160,.1); color: var(--accent); border: 1px solid rgba(0,229,160,.2); }
+    .tag-cycle { background: rgba(255,107,107,.1); color: var(--warn); border: 1px solid rgba(255,107,107,.2); }
+
+    .chevron {
+      color: var(--muted);
+      transition: transform .25s;
+      font-size: 12px;
+    }
+
+    .hc-body {
+      padding: 20px;
+      display: none;
+      border-top: 1px solid var(--border);
+    }
+
+    .hc-body.open { display: block; }
+
+    /* Tree renderer */
+    .tree-visual { font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.9; }
+
+    .tree-node-line { display: flex; align-items: center; gap: 6px; }
+    .tree-connector { color: #3d444d; }
+    .tree-node-label {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px; height: 26px;
+      border-radius: 6px;
+      background: rgba(0,229,160,.1);
+      color: var(--accent);
+      font-weight: 600;
+      font-size: 12px;
+      border: 1px solid rgba(0,229,160,.2);
+    }
+
+    .cycle-placeholder {
+      color: var(--muted);
+      font-style: italic;
+      font-size: 13px;
+    }
+
+    /* Pill lists */
+    .pill-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+
+    .pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      padding: 6px 14px;
+      border-radius: 100px;
+    }
+
+    .pill-invalid { background: rgba(255,107,107,.1); color: var(--warn); border: 1px solid rgba(255,107,107,.2); }
+    .pill-dup { background: rgba(255,169,77,.1); color: var(--dup); border: 1px solid rgba(255,169,77,.2); }
+    .pill-empty { font-size: 13px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+    /* Raw JSON */
+    .json-toggle {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 14px;
+      transition: color .15s;
+    }
+    .json-toggle:hover { color: var(--text); }
+
+    .json-box {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.7;
+      color: #adbac7;
+      white-space: pre-wrap;
+      word-break: break-all;
+      display: none;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    .json-box.open { display: block; }
+
+    @media (max-width: 600px) {
+      .summary-grid { grid-template-columns: 1fr; }
+      h1 { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="badge">POST /bfhl · SRM Challenge</div>
+    <h1>Node Hierarchy<br><span>Analyzer</span></h1>
+    <p class="subtitle">Feed edge strings, get back nested trees, cycle detection, and structured insights.</p>
+  </header>
+
+  <div class="input-card">
+    <div class="input-label">
+      <span>Edge List</span>
+      <button class="example-btn" onclick="loadExample()">Load example</button>
+    </div>
+    <textarea id="inputArea" placeholder='Enter edges one per line or comma-separated&#10;e.g. A->B, A->C, B->D'></textarea>
+    <div class="input-hint">// single uppercase letters · A->B format · one edge per line or comma-separated</div>
+    <button class="submit-btn" id="submitBtn" onclick="submitData()">
+      <div class="spinner"></div>
+      <span class="btn-text">▶ Analyze Hierarchy</span>
+    </button>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <div id="results">
+    <div class="results-header">
+      <h2>Results</h2>
+      <button class="clear-btn" onclick="clearResults()">✕ Clear</button>
+    </div>
+
+    <div class="identity-row" id="identityRow"></div>
+
+    <div class="section-title">Summary</div>
+    <div class="summary-grid" id="summaryGrid"></div>
+
+    <div class="section-title">Hierarchies</div>
+    <div class="hierarchies-list" id="hierarchiesList"></div>
+
+    <div class="section-title">Invalid Entries</div>
+    <div class="pill-list" id="invalidList"></div>
+
+    <div class="section-title">Duplicate Edges</div>
+    <div class="pill-list" id="dupList"></div>
+
+    <div class="section-title">Raw JSON</div>
+    <button class="json-toggle" id="jsonToggle" onclick="toggleJson()">{ } Show raw response</button>
+    <pre class="json-box" id="jsonBox"></pre>
+  </div>
+
+</div>
+
+<script>
+  // ── CONFIG: update to your deployed API URL ──────────────────────────────
+  const API_URL = 'http://localhost:3001/bfhl';
+  // ─────────────────────────────────────────────────────────────────────────
+
+  function loadExample() {
+    document.getElementById('inputArea').value =
+      'A->B, A->C, B->D, C->E, E->F,\nX->Y, Y->Z, Z->X,\nP->Q, Q->R,\nG->H, G->H, G->I,\nhello, 1->2, A->';
+  }
+
+  async function submitData() {
+    const raw = document.getElementById('inputArea').value.trim();
+    if (!raw) return;
+
+    const data = raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+
+    const btn = document.getElementById('submitBtn');
+    const errorBox = document.getElementById('errorBox');
+    btn.classList.add('loading');
+    btn.disabled = true;
+    errorBox.classList.remove('visible');
+
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      const json = await res.json();
+      renderResults(json);
+    } catch (e) {
+      errorBox.textContent = '⚠ ' + e.message;
+      errorBox.classList.add('visible');
+    } finally {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+  }
+
+  function renderResults(d) {
+    // Identity
+    document.getElementById('identityRow').innerHTML = [
+      { key: 'User ID', val: d.user_id },
+      { key: 'Email', val: d.email_id },
+      { key: 'Roll Number', val: d.college_roll_number },
+    ].map(i => `<div class="id-chip"><div class="key">${i.key}</div><div class="val">${i.val}</div></div>`).join('');
+
+    // Summary
+    const s = d.summary;
+    document.getElementById('summaryGrid').innerHTML = `
+      <div class="stat-card"><div class="stat-num">${s.total_trees}</div><div class="stat-label">Valid Trees</div></div>
+      <div class="stat-card"><div class="stat-num">${s.total_cycles}</div><div class="stat-label">Cyclic Groups</div></div>
+      <div class="stat-card"><div class="stat-num">${s.largest_tree_root || '—'}</div><div class="stat-label">Deepest Root</div></div>
+    `;
+
+    // Hierarchies
+    document.getElementById('hierarchiesList').innerHTML = d.hierarchies.map((h, i) => {
+      const isCycle = !!h.has_cycle;
+      const meta = isCycle ? 'cyclic group' : `depth: ${h.depth}`;
+      const badge = isCycle
+        ? '<span class="tag tag-cycle">⟳ cycle</span>'
+        : `<span class="tag tag-depth">depth ${h.depth}</span>`;
+
+      return `
+        <div class="hierarchy-card">
+          <div class="hc-header" onclick="toggleCard(${i})">
+            <div class="hc-left">
+              <div class="root-node ${isCycle ? 'cycle' : ''}">${h.root}</div>
+              <div class="hc-info">
+                <div class="hc-root">Root: ${h.root}</div>
+                <div class="hc-meta">${meta}</div>
+              </div>
+            </div>
+            <div class="hc-badges">${badge}<span class="chevron" id="chev-${i}">▼</span></div>
+          </div>
+          <div class="hc-body" id="hcb-${i}">
+            ${isCycle
+              ? `<div class="cycle-placeholder">⟳ Cycle detected — no tree structure available</div>`
+              : `<div class="tree-visual">${renderTreeHtml(h.tree, h.root, '', true)}</div>`
+            }
+          </div>
+        </div>`;
+    }).join('');
+
+    // Invalids
+    const invEl = document.getElementById('invalidList');
+    invEl.innerHTML = d.invalid_entries.length
+      ? d.invalid_entries.map(e => `<span class="pill pill-invalid">${escHtml(e) || '(empty)'}</span>`).join('')
+      : '<span class="pill-empty">none</span>';
+
+    // Dupes
+    const dupEl = document.getElementById('dupList');
+    dupEl.innerHTML = d.duplicate_edges.length
+      ? d.duplicate_edges.map(e => `<span class="pill pill-dup">${escHtml(e)}</span>`).join('')
+      : '<span class="pill-empty">none</span>';
+
+    // JSON
+    document.getElementById('jsonBox').textContent = JSON.stringify(d, null, 2);
+    document.getElementById('jsonBox').classList.remove('open');
+    document.getElementById('jsonToggle').textContent = '{ } Show raw response';
+
+    document.getElementById('results').classList.add('visible');
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function renderTreeHtml(treeObj, rootKey, prefix, isRoot) {
+    const node = treeObj[rootKey];
+    if (!node) return '';
+    const kids = Object.keys(node);
+    let html = `<div class="tree-node-line">
+      <span class="tree-connector">${isRoot ? '' : prefix}</span>
+      <span class="tree-node-label">${rootKey}</span>
+    </div>`;
+
+    kids.forEach((child, idx) => {
+      const last = idx === kids.length - 1;
+      const connector = last ? '└──' : '├──';
+      const childPrefix = prefix + (last ? '&nbsp;&nbsp;&nbsp;&nbsp;' : '│&nbsp;&nbsp;&nbsp;');
+      html += `<div class="tree-node-line">
+        <span class="tree-connector">${prefix}${connector}</span>
+        <span class="tree-node-label">${child}</span>
+      </div>`;
+      // Recursively render children of child
+      html += renderChildrenHtml(node[child], child, prefix + (last ? '&nbsp;&nbsp;&nbsp;&nbsp;' : '│&nbsp;&nbsp;&nbsp;'));
+    });
+
+    return html;
+  }
+
+  function renderChildrenHtml(subtree, nodeKey, prefix) {
+    const kids = Object.keys(subtree);
+    let html = '';
+    kids.forEach((child, idx) => {
+      const last = idx === kids.length - 1;
+      const connector = last ? '└──' : '├──';
+      const newPrefix = prefix + (last ? '&nbsp;&nbsp;&nbsp;&nbsp;' : '│&nbsp;&nbsp;&nbsp;');
+      html += `<div class="tree-node-line">
+        <span class="tree-connector">${prefix}${connector}</span>
+        <span class="tree-node-label">${child}</span>
+      </div>`;
+      html += renderChildrenHtml(subtree[child], child, newPrefix);
+    });
+    return html;
+  }
+
+  function toggleCard(i) {
+    const body = document.getElementById('hcb-' + i);
+    const chev = document.getElementById('chev-' + i);
+    body.classList.toggle('open');
+    chev.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : '';
+  }
+
+  function toggleJson() {
+    const box = document.getElementById('jsonBox');
+    const btn = document.getElementById('jsonToggle');
+    box.classList.toggle('open');
+    btn.textContent = box.classList.contains('open') ? '{ } Hide raw response' : '{ } Show raw response';
+  }
+
+  function clearResults() {
+    document.getElementById('results').classList.remove('visible');
+    document.getElementById('inputArea').value = '';
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Keyboard shortcut
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submitData();
+  });
+</script>
+</body>
+</html>
