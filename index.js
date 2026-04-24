@@ -6,9 +6,9 @@ app.use(cors());
 app.use(express.json());
 
 // ── CONFIG (fill in your real details) ──────────────────────────────────────
-const USER_ID = 'johndoe_17091999';          // fullname_ddmmyyyy
-const EMAIL_ID = 'john.doe@srmist.edu.in';   // your college email
-const COLLEGE_ROLL = '21CS1001';             // your roll number
+const USER_ID = 'vaibhav_22062005';          // fullname_ddmmyyyy
+const EMAIL_ID = 'vaibhav_ravikumar@srmap.edu.in';   // your college email
+const COLLEGE_ROLL = 'AP23110010425';             // your roll number
 // ────────────────────────────────────────────────────────────────────────────
 
 const VALID_EDGE = /^[A-Z]->[A-Z]$/;
