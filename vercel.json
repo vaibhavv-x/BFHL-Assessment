@@ -5,7 +5,7 @@
     { "src": "index.html", "use": "@vercel/static" }
   ],
   "routes": [
-    { "src": "/bfhl", "dest": "index.js" },
-    { "src": "/(.*)", "dest": "index.html" }
+    { "src": "^/bfhl$", "dest": "index.js" },
+    { "src": "^/$", "dest": "index.html" }
   ]
 }
