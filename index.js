@@ -170,9 +170,6 @@ function processData(data) {
   };
 
   return {
-    user_id: USER_ID,
-    email_id: EMAIL_ID,
-    college_roll_number: COLLEGE_ROLL,
     hierarchies,
     invalid_entries,
     duplicate_edges,
@@ -184,12 +181,21 @@ app.post('/bfhl', (req, res) => {
   const { data } = req.body;
 
   if (!Array.isArray(data)) {
-    return res.status(400).json({ error: '"data" must be an array of strings.' });
+    return res.status(400).json({
+      is_success: false,
+      error: '"data" must be an array of strings.'
+    });
   }
 
   try {
     const result = processData(data);
-    res.json(result);
+    res.status(200).json({
+      is_success: true,
+      user_id: USER_ID,
+      email: EMAIL_ID,
+      roll_number: COLLEGE_ROLL,
+      ...result
+});
   } catch (err) {
     res.status(500).json({ error: 'Internal server error', details: err.message });
   }
@@ -197,5 +203,4 @@ app.post('/bfhl', (req, res) => {
 
 app.get('/', (req, res) => res.json({ status: 'ok', message: 'BFHL API running. POST /bfhl' }));
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`API listening on port ${PORT}`));
+module.exports = app;
