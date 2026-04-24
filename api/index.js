@@ -5,15 +5,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ===== CONFIG (fill your details) =====
-const USER_ID = 'vaibhav_22062005';   // fullname_ddmmyyyy
+// ===== CONFIG =====
+const USER_ID = 'vaibhav_22062005';
 const EMAIL_ID = 'vaibhav_varikumar@srmist.edu.in';
 const COLLEGE_ROLL = 'AP23110010425';
 
-// ===== VALIDATION =====
 const VALID_EDGE = /^[A-Z]->[A-Z]$/;
 
-// ===== MAIN LOGIC =====
 function processData(data) {
   const invalid_entries = [];
   const duplicate_edges = [];
@@ -21,9 +19,10 @@ function processData(data) {
   const validEdges = [];
 
   for (let raw of data) {
-    const entry = typeof raw === 'string' ? raw.trim() : String(raw).trim();
+    const entry = typeof raw === 'string'
+      ? raw.trim().toUpperCase()
+      : String(raw).trim().toUpperCase();
 
-    // invalid format or self-loop
     if (!VALID_EDGE.test(entry) || entry[0] === entry[3]) {
       invalid_entries.push(raw);
       continue;
@@ -37,27 +36,24 @@ function processData(data) {
     }
   }
 
-  // adjacency
   const children = {};
   const parentOf = {};
 
   for (const edge of validEdges) {
     const [parent, child] = edge.split('->');
 
-    if (parentOf[child] !== undefined) continue; // multi-parent discard
+    if (parentOf[child] !== undefined) continue;
 
     parentOf[child] = parent;
     if (!children[parent]) children[parent] = [];
     children[parent].push(child);
   }
 
-  // all nodes
   const allNodes = new Set([
     ...Object.keys(children),
     ...Object.keys(parentOf),
   ]);
 
-  // union-find
   const parent = {};
   const find = (x) => {
     if (parent[x] === undefined) parent[x] = x;
@@ -86,7 +82,6 @@ function processData(data) {
     const compNodes = [...nodeSet];
     const compRoots = compNodes.filter(n => parentOf[n] === undefined).sort();
 
-    // cycle detection
     const detectCycle = (startNodes) => {
       const visited = new Set();
       const stack = new Set();
@@ -114,7 +109,6 @@ function processData(data) {
     };
 
     if (compRoots.length === 0) {
-      // pure cycle
       const cycleRoot = compNodes.sort()[0];
       hierarchies.push({ root: cycleRoot, tree: {}, has_cycle: true });
       continue;
@@ -127,7 +121,6 @@ function processData(data) {
       continue;
     }
 
-    // build tree
     const buildTree = (node) => {
       const obj = {};
       for (const child of (children[node] || [])) {
@@ -149,10 +142,8 @@ function processData(data) {
     }
   }
 
-  // sort
   hierarchies.sort((a, b) => a.root.localeCompare(b.root));
 
-  // summary
   const nonCyclic = hierarchies.filter(h => !h.has_cycle);
   const cyclic = hierarchies.filter(h => h.has_cycle);
 
@@ -182,8 +173,8 @@ function processData(data) {
 }
 
 // ===== ROUTE =====
-app.post('/bfhl', (req, res) => {
-  const { data } = req.body;
+app.post('/', (req, res) => {
+  const data = req.body?.data;
 
   if (!Array.isArray(data)) {
     return res.status(400).json({
@@ -201,8 +192,8 @@ app.post('/bfhl', (req, res) => {
       user_id: USER_ID,
       email_id: EMAIL_ID,
       college_roll_number: COLLEGE_ROLL,
-  ...result
-});
+      ...result
+    });
   } catch (err) {
     res.status(500).json({
       user_id: USER_ID,
@@ -214,10 +205,4 @@ app.post('/bfhl', (req, res) => {
   }
 });
 
-// ===== ROOT CHECK =====
-app.get('/', (req, res) => {
-  res.json({ status: 'ok', message: 'BFHL API running. Use POST /bfhl' });
-});
-
-// ===== EXPORT FOR VERCEL =====
 module.exports = app;
