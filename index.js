@@ -187,7 +187,9 @@ app.post('/bfhl', (req, res) => {
 
   if (!Array.isArray(data)) {
     return res.status(400).json({
-      is_success: false,
+      user_id: USER_ID,
+      email_id: EMAIL_ID,
+      college_roll_number: COLLEGE_ROLL,
       error: '"data" must be an array of strings.'
     });
   }
@@ -196,15 +198,16 @@ app.post('/bfhl', (req, res) => {
     const result = processData(data);
 
     res.status(200).json({
-      is_success: true,
       user_id: USER_ID,
-      email: EMAIL_ID,
-      roll_number: COLLEGE_ROLL,
-      ...result
-    });
+      email_id: EMAIL_ID,
+      college_roll_number: COLLEGE_ROLL,
+  ...result
+});
   } catch (err) {
     res.status(500).json({
-      is_success: false,
+      user_id: USER_ID,
+      email_id: EMAIL_ID,
+      college_roll_number: COLLEGE_ROLL,
       error: 'Internal server error',
       details: err.message
     });
