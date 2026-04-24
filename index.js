@@ -5,14 +5,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ── CONFIG (fill in your real details) ──────────────────────────────────────
-const USER_ID = 'vaibhav_22062005';          // fullname_ddmmyyyy
-const EMAIL_ID = 'vaibhav_ravikumar@srmap.edu.in';   // your college email
-const COLLEGE_ROLL = 'AP23110010425';             // your roll number
-// ────────────────────────────────────────────────────────────────────────────
+// ===== CONFIG (fill your details) =====
+const USER_ID = 'vaibhav_22062005';   // fullname_ddmmyyyy
+const EMAIL_ID = 'vaibhav_varikumar@srmist.edu.in';
+const COLLEGE_ROLL = 'AP23110010425';
 
+// ===== VALIDATION =====
 const VALID_EDGE = /^[A-Z]->[A-Z]$/;
 
+// ===== MAIN LOGIC =====
 function processData(data) {
   const invalid_entries = [];
   const duplicate_edges = [];
@@ -22,14 +23,13 @@ function processData(data) {
   for (let raw of data) {
     const entry = typeof raw === 'string' ? raw.trim() : String(raw).trim();
 
-    // Validate format: must be X->Y, single uppercase letters, not self-loop
+    // invalid format or self-loop
     if (!VALID_EDGE.test(entry) || entry[0] === entry[3]) {
       invalid_entries.push(raw);
       continue;
     }
 
     if (seenEdges.has(entry)) {
-      // Only push once to duplicate_edges per unique duplicate
       if (!duplicate_edges.includes(entry)) duplicate_edges.push(entry);
     } else {
       seenEdges.add(entry);
@@ -37,42 +37,42 @@ function processData(data) {
     }
   }
 
-  // Build adjacency: parent -> [children] (first-parent wins for multi-parent)
-  const children = {};   // parent -> [child, ...]
-  const parentOf = {};   // child -> parent (first parent wins)
+  // adjacency
+  const children = {};
+  const parentOf = {};
 
   for (const edge of validEdges) {
     const [parent, child] = edge.split('->');
-    if (parentOf[child] !== undefined) continue; // multi-parent: discard subsequent
+
+    if (parentOf[child] !== undefined) continue; // multi-parent discard
+
     parentOf[child] = parent;
     if (!children[parent]) children[parent] = [];
     children[parent].push(child);
   }
 
-  // All nodes
+  // all nodes
   const allNodes = new Set([
     ...Object.keys(children),
     ...Object.keys(parentOf),
   ]);
 
-  // Find roots: nodes that never appear as a child
-  const roots = [...allNodes].filter(n => parentOf[n] === undefined).sort();
-
-  // Group nodes into connected components using union-find
+  // union-find
   const parent = {};
   const find = (x) => {
     if (parent[x] === undefined) parent[x] = x;
     if (parent[x] !== x) parent[x] = find(parent[x]);
     return parent[x];
   };
-  const union = (a, b) => { parent[find(a)] = find(b); };
+  const union = (a, b) => {
+    parent[find(a)] = find(b);
+  };
 
   for (const edge of validEdges) {
     const [p, c] = edge.split('->');
     union(p, c);
   }
 
-  // Group by component representative
   const components = {};
   for (const node of allNodes) {
     const rep = find(node);
@@ -80,27 +80,32 @@ function processData(data) {
     components[rep].add(node);
   }
 
-  // For each component, find its root(s)
   const hierarchies = [];
 
-  for (const [rep, nodeSet] of Object.entries(components)) {
+  for (const [, nodeSet] of Object.entries(components)) {
     const compNodes = [...nodeSet];
     const compRoots = compNodes.filter(n => parentOf[n] === undefined).sort();
 
-    // Cycle detection: DFS from root(s) in the component
+    // cycle detection
     const detectCycle = (startNodes) => {
       const visited = new Set();
       const stack = new Set();
       let hasCycle = false;
 
       const dfs = (node) => {
-        if (stack.has(node)) { hasCycle = true; return; }
+        if (stack.has(node)) {
+          hasCycle = true;
+          return;
+        }
         if (visited.has(node)) return;
+
         visited.add(node);
         stack.add(node);
+
         for (const child of (children[node] || [])) {
           dfs(child);
         }
+
         stack.delete(node);
       };
 
@@ -109,13 +114,12 @@ function processData(data) {
     };
 
     if (compRoots.length === 0) {
-      // Pure cycle: use lex-smallest node as root
+      // pure cycle
       const cycleRoot = compNodes.sort()[0];
       hierarchies.push({ root: cycleRoot, tree: {}, has_cycle: true });
       continue;
     }
 
-    // Check for cycles within component from its roots
     const hasCycle = detectCycle(compRoots);
 
     if (hasCycle) {
@@ -123,7 +127,7 @@ function processData(data) {
       continue;
     }
 
-    // Build nested tree object recursively
+    // build tree
     const buildTree = (node) => {
       const obj = {};
       for (const child of (children[node] || [])) {
@@ -132,34 +136,34 @@ function processData(data) {
       return obj;
     };
 
-    // Depth calculation
     const calcDepth = (node) => {
       const kids = children[node] || [];
       if (kids.length === 0) return 1;
       return 1 + Math.max(...kids.map(calcDepth));
     };
 
-    // Handle multiple roots in a component (shouldn't happen with valid edges but be safe)
     for (const root of compRoots) {
       const tree = { [root]: buildTree(root) };
       const depth = calcDepth(root);
-      hierarchies.push({ root, tree, depth });
+      hierarchies.push({ root, tree, depth, has_cycle: false });
     }
   }
 
-  // Sort hierarchies: non-cyclic first (by depth desc), then cyclic
-  // (keep original order for evaluator but put summary together)
-  // Actually just sort by root lex for determinism
+  // sort
   hierarchies.sort((a, b) => a.root.localeCompare(b.root));
 
-  // Summary
+  // summary
   const nonCyclic = hierarchies.filter(h => !h.has_cycle);
   const cyclic = hierarchies.filter(h => h.has_cycle);
 
   let largest_tree_root = '';
   if (nonCyclic.length > 0) {
     const maxDepth = Math.max(...nonCyclic.map(h => h.depth));
-    const candidates = nonCyclic.filter(h => h.depth === maxDepth).map(h => h.root).sort();
+    const candidates = nonCyclic
+      .filter(h => h.depth === maxDepth)
+      .map(h => h.root)
+      .sort();
+
     largest_tree_root = candidates[0];
   }
 
@@ -177,6 +181,7 @@ function processData(data) {
   };
 }
 
+// ===== ROUTE =====
 app.post('/bfhl', (req, res) => {
   const { data } = req.body;
 
@@ -189,18 +194,27 @@ app.post('/bfhl', (req, res) => {
 
   try {
     const result = processData(data);
+
     res.status(200).json({
       is_success: true,
       user_id: USER_ID,
       email: EMAIL_ID,
       roll_number: COLLEGE_ROLL,
       ...result
-});
+    });
   } catch (err) {
-    res.status(500).json({ error: 'Internal server error', details: err.message });
+    res.status(500).json({
+      is_success: false,
+      error: 'Internal server error',
+      details: err.message
+    });
   }
 });
 
-app.get('/', (req, res) => res.json({ status: 'ok', message: 'BFHL API running. POST /bfhl' }));
+// ===== ROOT CHECK =====
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: 'BFHL API running. Use POST /bfhl' });
+});
 
+// ===== EXPORT FOR VERCEL =====
 module.exports = app;
